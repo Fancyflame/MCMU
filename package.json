@@ -1,0 +1,14 @@
+{
+  "name": "mcmu",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node cmd.js"
+  },
+  "bin":{
+    "mcmu":"./index.js"
+  },
+  "author": "FancyFlame",
+  "license": "ISC"
+}
