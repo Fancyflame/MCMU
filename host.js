@@ -9,7 +9,7 @@ let mcgameport;
 host.on("ready",()=>{
   console.log(`连接已完成，编码：${host.IPcode}`);
 });
-host.on("error",(err)=>{
+host.on("errorr",(err)=>{
   console.log("哎呀！连接失败了！请看看配置是否正确！\n"+err);
   process.exit(0);
 });
