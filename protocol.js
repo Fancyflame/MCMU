@@ -75,11 +75,15 @@ const createHost=function(Port,Addr){
     s.connect(Port,Addr,()=>{
       s.send("open");
       s.state="waiting"
-    })
+    });
+    setInterval(()=>{
+      s.send("heartbeat")
+    },10*1000)
   });
   s.on("message",(msg,rinfo)=>{
     let o=unpack(msg);
-    if(s.state=="open"&&o.method=="conn"){
+    if(o.method=="heartbeat")return
+    else if(s.state=="open"&&o.method=="conn"){
       let [sktname,confirm]=o.params;
       
       //客户端加入事件
@@ -181,6 +185,9 @@ const createServer=function(){
     let o=unpack(msg);
     if(!o)return;
     switch(o.method){
+      case "heartbeat":
+        s.send("#heartbeat",...key);
+        return;
       case "open":
         let id=Math.random().toString().slice(2,10);
         if(hosts.has(id)){
