@@ -114,8 +114,6 @@ function host(){
         }else if(from=="local"){
           //描述包
           let s=msg.toString().split(";");
-          gameport=parseInt(s[s.length-3]);
-          console.log(gameport);
           skt.Send(msg);
         }
       });
@@ -127,6 +125,7 @@ function host(){
         if(from=="server"&&gameport){
           skt.send(msg,gameport);
         }else if(from=="local"){
+          gameport=parseInt(s[s.length-3]);
           skt.Send(msg);
         }
       })
