@@ -80,9 +80,10 @@ function client(code,pwd){
         let s=msg.toString("binary");
         //示例：6��c��V�o�����������4VxYMCPE;Maddogchx;389;1.14.1;1;8;9636815373020996724;空的超平坦;Creative;1;62475;62476;
         s=s.split(";");
-        s[1]="MCMU_"+s[1];
+        //s[1]="MCMU_"+s[1];
         s.splice(-3,2,fakegameport,fakegameport+1);
         s=s.join(";");
+        console.log("服务器："+s);
         msgr2.send(Buffer.from(s,"binary"),msgrport);
       }else{
         console.log(rinfo)
