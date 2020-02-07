@@ -113,8 +113,8 @@ function host(){
           skt.send(msg,19132,"255.255.255.255");
         }else if(from=="local"){
           //描述包
-          gameport=parseInt(s[s.length-3]);
           let s=msg.toString().split(";");
+          gameport=parseInt(s[s.length-3]);
           skt.Send(msg);
         }
       });
