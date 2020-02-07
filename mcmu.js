@@ -48,6 +48,16 @@ const {
 function client(code,pwd){
   let msgr=pro.createClient(rmtport,rmtaddr,code,"Messenger");
   let game=pro.createClient(rmtport,rmtaddr,code,"Gamer");
+  let msgr2=dgram.createSocket("udp4");
+  msgr2.bind(19132,()=>{
+    msgr2.on("message",(msg,rinfo)=>{
+      if(isLocal(rinfo.address)){
+        console.log("本地发来数据");
+        msgr.udp.Send(msg);
+        msgrport=rinfo.port;
+      }else console.log(rinfo)
+    });
+  })
   let gameport;
   let msgrport;
   game.on("Connect",(udp)=>{
@@ -57,16 +67,16 @@ function client(code,pwd){
     console.log("已连接到服务器");
     udp.on("Message",(msg,from,rinfo)=>{
       if(from=="server"&&msgrport&&gameport){
+        console.log("服务器发来数据")
         let s=msg.toString("binary");
         //示例：6��c��V�o�����������4VxYMCPE;Maddogchx;389;1.14.1;1;8;9636815373020996724;空的超平坦;Creative;1;62475;62476;
         s=s.split(";");
         s[1]="MCMU_"+s[1];
         s.splice(-3,2,gameport,gameport+1);
         s=s.join(";");
-        udp.send(Buffer.from(s,"binary"),msgrport,rinfo.port);
-      }else if(from=="local"){
-        msgrport=rinfo.port;
-        udp.Send(msg);
+        msgr2.send(Buffer.from(s,"binary"),msgrport,rinfo.port);
+      }else{
+        console.log(rinfo)
       }
     });
   });
@@ -88,7 +98,9 @@ function host(){
     let gameport;
     if(name=="Messenger"){
       console.log("Messenger joined");
+      skt.setBroadcast(true);
       skt.on("Message",(msg,from)=>{
+        console.log("有数据包来自"+from)
         if(from=="server"){
           skt.send(msg,19132,"255.255.255.255");
         }else if(from=="local"){
