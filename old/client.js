@@ -2,7 +2,7 @@
                                                                                                                                                                                                                                                                                                                                                                                                 
 const pro=require("./protocol.js");
 const dgram=require("dgram");
-let ipcode=parseInt(process.argv[2]);
+let ipcode=process.argv[2];
 if(!ipcode){
   console.log("请输入编码！");
   process.exit();
@@ -34,12 +34,21 @@ msgr.on("connected",()=>{
 })
 msgr.on("Message",(msg,from,rinfo)=>{
   if(from=="server"){
+    console.log("data from srv");
     //从服主那里发来的
     let s=msg.toString("binary");
     //示例：6��c��V�o�����������4VxYMCPE;Maddogchx;389;1.14.1;1;8;9636815373020996724;空的超平坦;Creative;1;62476;62477;
     s=s.split(";");
     s[1]="[MCMU]-"+s[1];
     s.splice(-3,2,mcgameport,mcgameport+1);
+    /*{
+      let pt=parseInt(s.slice(-3,-2)[0]);
+      if(mcgameport!=pt){
+        console.log(pt)
+        mcgameport=pt;
+        restartRecv();
+      }
+    }*/
     s=s.join(";");
     //console.log(s);
     if(mcmsgrport){
@@ -47,10 +56,10 @@ msgr.on("Message",(msg,from,rinfo)=>{
       //万一真碰上了呢
       msgr.send(Buffer.from(s,"binary"),mcmsgrport,pro.staticWlanIP);
     }
-  }else if(rinfo.address=="127.0.0.1"){
+  }else if(pro.isLocalAddr(rinfo.address)){
     //从本地发来的
     msgr.Send(msg);
-  }//else console.log("useless data from"+JSON.stringify(rinfo));
+  }else console.log("useless data from"+JSON.stringify(rinfo));
 });
 msgr.on("close",()=>{
   console.log("连接失败");
@@ -59,9 +68,12 @@ msgr.on("close",()=>{
 msgr.bind(()=>{
   let info=msgr.address();
   let n=dgram.createSocket("udp4");
-  n.bind(19132,pro.staticRaknet);
+  //n.bind(19132,pro.staticRaknet);
+  n.bind(6789);
   n.on("message",(msg,rinfo)=>{
-    if(rinfo.address==pro.staticWlanIP){
+    if(rinfo.port!=info.port){
+      //本地来的
+      console.log(msg.toString());
       n.send(msg,info.port,info.address);
       mcmsgrport=rinfo.port;
     }
@@ -70,7 +82,10 @@ msgr.bind(()=>{
 
 
 let gameConnector;
-const gmr=pro.createClient({
+let gmr;
+/*function restartRecv(){
+  if(gmr)gmr.close();*/
+gmr=pro.createClient({
   serverPort:remotePort,
   serverAddr:remoteAddr,
   IPcode:ipcode,
@@ -78,11 +93,11 @@ const gmr=pro.createClient({
 });
 gmr.bind(()=>{
   mcgameport=gmr.address().port;
-  let te=dgram.createSocket("udp4");
+  /*let te=dgram.createSocket("udp4");
   te.bind(mcgameport+1);
   te.on("message",(msg)=>{
     console.log("MSG!");
-  })
+  })*/
 });
 gmr.on("Message",(msg,from,rinfo)=>{
   if(from=="server"&&gameConnector){
@@ -93,3 +108,4 @@ gmr.on("Message",(msg,from,rinfo)=>{
     gmr.Send(msg);
   }else console.log(rinfo)
 })
+//}

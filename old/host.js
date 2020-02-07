@@ -21,7 +21,6 @@ host.on("join",(n,callback)=>{
     callback(s);
     s.on("Message",(msg,from,rinfo)=>{
       if(from=="server"){
-        console.log("收到服务器信息");
         s.send(msg,19130,pro.staticRaknet);
       }else if(rinfo.address==pro.staticWlanIP||rinfo.address=="127.0.0.1"){
         let str=msg.toString("binary");
@@ -63,7 +62,7 @@ console.log("连接中...");
   setInterval(()=>{
     if(!ri)return;
     s.send(Buffer.from(explain),ri.port,ri.address);
-  })
+  },500);
   s.on("message",(msg,rinfo)=>{
     ri=rinfo;
     //console.log(ri)
