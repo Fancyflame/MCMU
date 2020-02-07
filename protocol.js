@@ -22,16 +22,20 @@ function genuuid(){
 const Pack=obj=>Buffer.from(JSON.stringify(obj)+"\r\n");
 const Unpack=buf=>{
   let s=buf.toString();
+  if(s=="\r\n"||!s)return null;
   return JSON.parse(s.slice(-2)=="\r\n"?s.slice(0,-2):s);
 }
 const AutoUnpack=(c,fn)=>{
   let rest;
   c.on("data",(buf)=>{
-    if(rest)buf=Buffer.concat(rest,buf);
+    if(rest)buf=Buffer.concat([rest,buf]);
     buf=buf.toString("utf8").split("\r\n");
-    rest=buf.pop();
+    rest=Buffer.from(buf.pop());
     buf=buf.map(x=>Unpack(x));
-    buf.forEach(fn);
+    buf.forEach(function(e){
+      if(e==null)return;
+      fn.apply(null,arguments);
+    });
   });
 }
 
@@ -156,7 +160,9 @@ const createServer=function(){
             break;
         }
     });
+    c.on("error",()=>{})
   });
+  srv.on("error",(err)=>{});//console.log(err)})
   return srv;
 }
 
@@ -215,6 +221,13 @@ const createHost=function(Port,Addr){
   */
   let code;
   let c=net.createConnection(Port,Addr,()=>{
+    let timer=setInterval(()=>{
+      if(c.destroyed){
+        clearInterval(timer);
+        return;
+      }
+      c.write(Buffer.from("\r\n"),Port,Addr);
+    },7*1000);
     c.write(Pack({
       method:"create",
       status:2
