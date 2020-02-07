@@ -103,8 +103,8 @@ function host(){
     console.log("哎唷，连接失败啦！");
     process.exit();
   });
+  let gameport;
   host.on("Join",(name,skt)=>{
-    let gameport;
     if(name=="Messenger"){
       console.log("Messenger joined");
       skt.setBroadcast(true);
@@ -113,6 +113,7 @@ function host(){
           skt.send(msg,19132,"255.255.255.255");
         }else if(from=="local"){
           //描述包
+          gameport=parseInt(s[s.length-3]);
           let s=msg.toString().split(";");
           skt.Send(msg);
         }
@@ -125,7 +126,6 @@ function host(){
         if(from=="server"&&gameport){
           skt.send(msg,gameport);
         }else if(from=="local"){
-          gameport=parseInt(s[s.length-3]);
           skt.Send(msg);
         }
       })
