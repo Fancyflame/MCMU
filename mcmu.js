@@ -49,32 +49,41 @@ function client(code,pwd){
   let msgr=pro.createClient(rmtport,rmtaddr,code,"Messenger");
   let game=pro.createClient(rmtport,rmtaddr,code,"Gamer");
   let msgr2=dgram.createSocket("udp4");
+  let fakegameport;//这是用于改写描述包的
+  let mcgameport;//本地mc的
+  let msgrport;
   msgr2.bind(19132,()=>{
     msgr2.on("message",(msg,rinfo)=>{
       if(isLocal(rinfo.address)){
-        console.log("本地发来数据");
         msgr.udp.Send(msg);
         msgrport=rinfo.port;
-      }else console.log(rinfo)
+      }
     });
   })
-  let gameport;
-  let msgrport;
   game.on("Connect",(udp)=>{
-    gameport=udp.address().port;
+    fakegameport=udp.address().port;
+  });
+  game.on("Message",(msg,from,rinfo)=>{
+    if(from=="local"){
+      mcgameport=rinfo.port;
+      game.udp.Send(msg);
+      console.log("本地发来数据");
+    }else if(from=="server"){
+      console.log("服务器发来数据");
+      game.udp.send(msg,mcgameport);
+    }
   })
   msgr.on("Connect",(udp)=>{
     console.log("已连接到服务器");
     udp.on("Message",(msg,from,rinfo)=>{
-      if(from=="server"&&msgrport&&gameport){
-        console.log("服务器发来数据")
+      if(from=="server"&&msgrport&&fakegameport){
         let s=msg.toString("binary");
         //示例：6��c��V�o�����������4VxYMCPE;Maddogchx;389;1.14.1;1;8;9636815373020996724;空的超平坦;Creative;1;62475;62476;
         s=s.split(";");
         s[1]="MCMU_"+s[1];
-        s.splice(-3,2,gameport,gameport+1);
+        s.splice(-3,2,fakegameport,fakegameport+1);
         s=s.join(";");
-        msgr2.send(Buffer.from(s,"binary"),msgrport,rinfo.port);
+        msgr2.send(Buffer.from(s,"binary"),msgrport);
       }else{
         console.log(rinfo)
       }
@@ -100,13 +109,13 @@ function host(){
       console.log("Messenger joined");
       skt.setBroadcast(true);
       skt.on("Message",(msg,from)=>{
-        console.log("有数据包来自"+from)
         if(from=="server"){
           skt.send(msg,19132,"255.255.255.255");
         }else if(from=="local"){
           //描述包
           let s=msg.toString().split(";");
           gameport=parseInt(s[s.length-3]);
+          console.log(gameport);
           skt.Send(msg);
         }
       });
@@ -114,15 +123,13 @@ function host(){
       //游戏数据
       console.log("Gamer joined");
       skt.on("Message",(msg,from,rinfo)=>{
+        console.log("有数据包来自"+from);
         if(from=="server"&&gameport){
-          skt.send(msg,gameport,rinfo.address);
+          skt.send(msg,gameport);
         }else if(from=="local"){
           skt.Send(msg);
         }
       })
-    }else{
-      console.log(skt)
-      skt.close();
     }
   })
 }
