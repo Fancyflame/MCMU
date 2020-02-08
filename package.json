@@ -2,7 +2,7 @@
   "name": "mcmu",
   "version": "1.1.1",
   "description": "",
-  "main": "mcmu.js",
+  "main": "mcmu2.js",
   "scripts": {
     "test": "echo hey!"
   },

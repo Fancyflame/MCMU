@@ -57,7 +57,7 @@ const createServer=function(){
   hostjoin(code)事件
   clientjoin(code)事件
   hostexit(code)事件
-  clientexit()事件：测试版没有
+  clientexit(code)事件
   */
   let udpPort;
   const udp=dgram.createSocket("udp4");
@@ -115,21 +115,42 @@ const createServer=function(){
                   let canMsg=false;
                   function udpCnct(msg,rinfo){
                     let para=[rinfo.port,rinfo.address];
+                    let notPing=[];//还没有发送ping的主机
                     if(!canMsg){
                       if(msg.toString()==confirm){
                         cfm.push(para);
                         if(cfm.length==2){
+                          //连接完成。
                           canMsg=true;
                           cfm.forEach(e=>udp.send(Buffer.alloc(1),...e));
                           cfm={
                             [cfm[0].join(":")]:cfm[1],
                             [cfm[1].join(":")]:cfm[0]
                           }
+                          let pingChecker=setInterval(()=>{
+                            //定期检查socket存活状态
+                            if(notPing.length!=0){
+                              udp.off("message",udpCnct);
+                              clearInterval(pingChecker);
+                              srv.emit("clientexit",id);
+                            }else{
+                              notPing=Object.keys(cfm);
+                              console.log("存活");
+                            }
+                          },10*1000)
                           srv.emit("clientjoin",id);
                         }
                       }
                     }else{
-                      let m=cfm[para.join(":")];
+                      let k=para.join(":")
+                      let m=cfm[k];
+                      if(msg.toString()==confirm){
+                        //检查ping
+                        if(notPing.length!=0){
+                          notPing.splice(notPing.indexOf(k),1);
+                        }
+                        return;
+                      }
                       if(m)udp.send(msg,...m);
                     }
                   }
@@ -299,6 +320,9 @@ const createSender=function(Port,Addr,confirm){
   s.once("message",()=>{
     s.state="ready";
     s.emit("Connect");
+    setInterval(()=>{
+      s.Send(confirm);
+    },7*1000)
   })
   return s;
 }
@@ -338,7 +362,7 @@ function test(){
       })
     });
   });
-  host.on("Join",(name,skt)=>{
+  host.on("Joinn",(name,skt)=>{
     setInterval(()=>{
       skt.Send("yoohoo")
     },1000);
