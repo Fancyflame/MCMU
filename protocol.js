@@ -160,7 +160,9 @@ const createServer=function(){
             break;
         }
     });
-    c.on("error",()=>{})
+    c.on("error",(err)=>{
+      console.log(err);
+    })
   });
   srv.on("error",(err)=>{});//console.log(err)})
   return srv;
