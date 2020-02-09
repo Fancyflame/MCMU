@@ -57,6 +57,7 @@ function client(code,pwd){
   let fakegameport;//这是用于改写描述包的
   let mcgameport;//本地mc的
   let msgrport;
+  const exit=()=>process.exit(0);
   msgr2.bind(19132,()=>{
     console.log("本地信使端口已开启");
     msgr2.on("message",(msg,rinfo)=>{
@@ -74,10 +75,10 @@ function client(code,pwd){
       let s=d.toString("binary");
       //示例：6��c��V�o�����������4VxYMCPE;Maddogchx;389;1.14.1;1;8;9636815373020996724;空的超平坦;Creative;1;62475;62476;
       s=s.split(";");
-      //s[1]="MCMU_"+s[1];
+      s[1]="MCMU_"+s[1];
       s.splice(-3,2,fakegameport,fakegameport+1);
       s=s.join(";");
-      console.log("服务器："+s);
+      //console.log("服务器："+s);
       msgr2.send(Buffer.from(s,"binary"),msgrport);
     })
   });
@@ -99,6 +100,10 @@ function client(code,pwd){
   });
   msgr.on("Error",(reason)=>{
     console.log("连接失败，因为："+reason);
+    setTimeout(exit,500);
+  });
+  msgr.on("close",()=>{
+    console.log("连接已关闭");
     process.exit();
   })
 }
@@ -109,23 +114,26 @@ function host(){
   });
   host.on("Error",(reason)=>{
     console.log("没法开服，因为："+reason);
-    process.exit();
+    setTimeout(()=>process.exit(),500);
   });
   let gameport;
   host.on("Join",(name,tcp)=>{
+    let skt
     if(name=="Messenger"){
       console.log("Messenger joined");
-      let skt=dgram.createSocket("udp4");
+      skt=dgram.createSocket("udp4");
       skt.bind(()=>{
         skt.setBroadcast(true);
         tcp.on("data",(d)=>{
-          //描述包
-          let s=d.toString().split(";");
-          gameport=parseInt(s[s.length-3]);
-          //skt.send(d,19132,"255.255.255.255");
+          //TODO
+          skt.send(d,19132);
         });
         skt.on("message",(msg,rinfo)=>{
           if(isLocal(rinfo.address)){
+            //描述包
+            let s=msg.toString().split(";");
+            //console.log(s)
+            gameport=parseInt(s[s.length-3]);
             tcp.write(msg);
           }
         });
@@ -133,7 +141,7 @@ function host(){
     }else if(name=="Gamer"){
       //游戏数据
       console.log("Gamer joined");
-      let skt=dgram.createSocket("udp4");
+      skt=dgram.createSocket("udp4");
       skt.bind(()=>{
         tcp.on("data",(d)=>{
           skt.send(d,gameport);
@@ -145,6 +153,13 @@ function host(){
         });
       })
     }
+    if(skt){
+      skt.on("close",_=>tcp.end());
+      tcp.on("close",_=>skt.close());
+    }
+  });
+  host.on("Exit",(name)=>{
+    console.log(name+" Exitted");
   })
 }
 function server(){
@@ -164,5 +179,6 @@ function server(){
   });
   srv.on("clientexit",(id)=>{
     console.log(`有玩家退出${id}`)
-  })
+  });
+  srv.on("Error",err=>console.log(err))
 }

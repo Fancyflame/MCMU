@@ -66,7 +66,7 @@ const createServer=function(){
   */
   let usedIds=new Map();
   let srv=net.createServer((c)=>{
-    c.on("eerror",err=>console.log(err))
+    c.on("error",err=>srv.emit("Error",err));
     AutoUnpack(c,(obj)=>{
       if(obj.method=="create"){
         /*创建房间
@@ -133,6 +133,7 @@ const createServer=function(){
               srv.emit("clientexit",code);
             });
             srv.emit("clientjoin",code);
+            srv.off("connection",arguments.callee);
           })
         });
       }
@@ -164,6 +165,9 @@ const createHost=function(Port,Addr){
           c2.write(Pack({
             confirm:confirm
           }));
+          c2.on("close",()=>{
+            c.emit("Exit",obj.name,c2);
+          })
           c.emit("Join",obj.name,c2);
         })
       }
