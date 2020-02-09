@@ -41,7 +41,7 @@ const {
       server();
       break;
     default:
-      console.log("第三个参数必须是open,join或者server");
+      console.log("第二个参数必须是open,join或者server");
       process.exit();
       break;
   }
@@ -49,7 +49,10 @@ const {
 function client(code,pwd){
   let msgr=pro.createClient(rmtport,rmtaddr,code,"Messenger");
   let game=pro.createClient(rmtport,rmtaddr,code,"Gamer");
-  let msgr2=dgram.createSocket("udp4");
+  let msgr2=dgram.createSocket({
+    type:"udp4",
+    reuseAddr:true
+  });
   let game2=dgram.createSocket("udp4");
   let fakegameport;//这是用于改写描述包的
   let mcgameport;//本地mc的
@@ -58,6 +61,7 @@ function client(code,pwd){
     console.log("本地信使端口已开启");
     msgr2.on("message",(msg,rinfo)=>{
       if(isLocal(rinfo.address)){
+        console.log("msgr2");
         msgr.write(msg);
         msgrport=rinfo.port;
       }
@@ -66,6 +70,7 @@ function client(code,pwd){
   msgr.on("Connect",()=>{
     console.log("Messenger管道已连接")
     msgr.on("data",(d)=>{
+      console.log("msgr");
       let s=d.toString("binary");
       //示例：6��c��V�o�����������4VxYMCPE;Maddogchx;389;1.14.1;1;8;9636815373020996724;空的超平坦;Creative;1;62475;62476;
       s=s.split(";");
@@ -80,6 +85,7 @@ function client(code,pwd){
     console.log("本地游戏端口已开启");
     fakegameport=game2.address().port;
     game2.on("message",(msg)=>{
+      console.log("game2")
       game.write(msg);
     })
   });
@@ -87,6 +93,7 @@ function client(code,pwd){
     console.log("Gamer管道已连接")
     //fakegameport=udp.address().port;
     game.on("data",()=>{
+      console.log("game2")
       game2.send(msg,mcgameport);
     })
   });
@@ -113,9 +120,9 @@ function host(){
         skt.setBroadcast(true);
         tcp.on("data",(d)=>{
           //描述包
-          let s=msg.toString().split(";");
+          let s=d.toString().split(";");
           gameport=parseInt(s[s.length-3]);
-          skt.send(msg,19132,"255.255.255.255");
+          //skt.send(d,19132,"255.255.255.255");
         });
         skt.on("message",(msg,rinfo)=>{
           if(isLocal(rinfo.address)){

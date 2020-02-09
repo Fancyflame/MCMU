@@ -66,6 +66,7 @@ const createServer=function(){
   */
   let usedIds=new Map();
   let srv=net.createServer((c)=>{
+    c.on("eerror",err=>console.log(err))
     AutoUnpack(c,(obj)=>{
       if(obj.method=="create"){
         /*创建房间
@@ -188,9 +189,29 @@ const createClient=function(Port,Addr,IPcode,name){
         c.state="ready";
         c.emit("Connect");
       }
-    })
+    });
   });
   return c;
+}
+
+function getWlanIP(){
+  let obj=os.networkInterfaces();
+  for(let i in obj){
+    for(let o of obj[i]){
+      if(o.family!="IPv4")continue;
+      if(/^192\.168\./.test(o.address)){
+        return o.address;
+      }
+    }
+  }
+  return null;
+}
+
+module.exports={
+  createServer,
+  createHost,
+  createClient,
+  getWlanIP
 }
 //test();
 function test(){
