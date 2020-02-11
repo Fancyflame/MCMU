@@ -74,7 +74,7 @@ function client(code, pwd) {
   });
   msgr.on("Connect", () => {
     console.log("Messenger管道已连接")
-    msgr.on("data", (d) => {
+    msgr.udp.on("Message", (d) => {
       logs("msgr");
       let s = d.toString("binary");
       //示例：6��c��V�o�����������4VxYMCPE;Maddogchx;389;1.14.1;1;8;9636815373020996724;空的超平坦;Creative;1;62475;62476;
@@ -98,8 +98,8 @@ function client(code, pwd) {
   game.on("Connect", () => {
     console.log("Gamer管道已连接")
     //fakegameport=udp.address().port;
-    game.on("data", (d) => {
-      logs("game")
+    game.udp.on("Message", (d) => {
+      logs("game");
       game2.send(d, mcgameport);
     })
   });
@@ -107,10 +107,6 @@ function client(code, pwd) {
     console.log("连接失败，因为：" + reason);
     setTimeout(exit, 500);
   });
-  msgr.on("close", () => {
-    console.log("连接已关闭");
-    process.exit();
-  })
 }
 function host() {
   let host = pro.createHost(rmtport, rmtaddr);
@@ -123,16 +119,16 @@ function host() {
   });
   let gameport;
   host.on("Join", (name, cli) => {
-    let skt
+    let skt;
     if (name == "Messenger") {
       console.log("Messenger joined");
       skt = dgram.createSocket("udp4");
       skt.bind(() => {
         skt.setBroadcast(true);
-        cli.on("data", (d) => {
+        cli.on("message", (msg) => {
           //TODO
           logs("msgr");
-          skt.send(d, 19131);
+          skt.send(msg, 19132,"255.255.255.255");
         });
         skt.on("message", (msg, rinfo) => {
           if (isLocal(rinfo.address)) {
@@ -140,7 +136,7 @@ function host() {
             let s = msg.toString().split(";");
             logs("msgr2");
             gameport = parseInt(s[s.length - 3]);
-            cli.udp.Send(msg);
+            cli.Send(msg);
           }
         });
       });
@@ -149,20 +145,20 @@ function host() {
       console.log("Gamer joined");
       skt = dgram.createSocket("udp4");
       skt.bind(() => {
-        cli.on("data", (d) => {
+        cli.on("message", (d) => {
           logs("game");
           skt.send(d, gameport);
         });
         skt.on("message", (msg, rinfo) => {
           if (isLocal(rinfo.address)) {
             logs("game2");
-            cli.udp.Send(msg);
+            cli.Send(msg);
           }
         });
       })
     }
     if (skt) {
-      skt.on("close", _ => cli.end());
+      skt.on("close", _ => cli.close());
       cli.on("close", _ => skt.close());
     }
   });
