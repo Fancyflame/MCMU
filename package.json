@@ -1,13 +1,13 @@
 {
   "name": "mcmu",
-  "version": "1.2.5",
+  "version": "1.2.9",
   "description": "",
-  "main": "mcmu2.js",
+  "main": "mcmu.js",
   "scripts": {
     "test": "echo hey!"
   },
   "bin": {
-    "mcmu": "./mcmu2.js"
+    "mcmu": "./mcmu.js"
   },
   "author": "FancyFlame",
   "license": "ISC"

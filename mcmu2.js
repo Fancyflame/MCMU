@@ -14,6 +14,10 @@ function tp(p){
 function isLocal(ad){
   return (ad=="127.0.0.1"||ad==pro.getWlanIP())
 }
+let DEBUG=true;
+function logs(){
+  if(DEBUG)console.log(...arguments);
+}
 const {
   remoteAddr:rmtaddr,
   remotePort:rmtport,
@@ -62,7 +66,7 @@ function client(code,pwd){
     console.log("本地信使端口已开启");
     msgr2.on("message",(msg,rinfo)=>{
       if(isLocal(rinfo.address)){
-        console.log("msgr2");
+        logs("msgr2");
         msgr.write(msg);
         msgrport=rinfo.port;
       }
@@ -71,7 +75,7 @@ function client(code,pwd){
   msgr.on("Connect",()=>{
     console.log("Messenger管道已连接")
     msgr.on("data",(d)=>{
-      console.log("msgr");
+      logs("msgr");
       let s=d.toString("binary");
       //示例：6��c��V�o�����������4VxYMCPE;Maddogchx;389;1.14.1;1;8;9636815373020996724;空的超平坦;Creative;1;62475;62476;
       s=s.split(";");
@@ -85,17 +89,18 @@ function client(code,pwd){
   game2.bind(()=>{
     console.log("本地游戏端口已开启");
     fakegameport=game2.address().port;
-    game2.on("message",(msg)=>{
-      console.log("game2")
+    game2.on("message",(msg,rinfo)=>{
+      logs("game2");
+      mcgameport=rinfo.port;
       game.write(msg);
     })
   });
   game.on("Connect",()=>{
     console.log("Gamer管道已连接")
     //fakegameport=udp.address().port;
-    game.on("data",()=>{
-      console.log("game2")
-      game2.send(msg,mcgameport);
+    game.on("data",(d)=>{
+      logs("game")
+      game2.send(d,mcgameport);
     })
   });
   msgr.on("Error",(reason)=>{
@@ -126,13 +131,14 @@ function host(){
         skt.setBroadcast(true);
         tcp.on("data",(d)=>{
           //TODO
+          logs("msgr");
           skt.send(d,19132);
         });
         skt.on("message",(msg,rinfo)=>{
           if(isLocal(rinfo.address)){
             //描述包
             let s=msg.toString().split(";");
-            //console.log(s)
+            logs("msgr2");
             gameport=parseInt(s[s.length-3]);
             tcp.write(msg);
           }
@@ -144,10 +150,12 @@ function host(){
       skt=dgram.createSocket("udp4");
       skt.bind(()=>{
         tcp.on("data",(d)=>{
+          logs("game");
           skt.send(d,gameport);
         });
         skt.on("message",(msg,rinfo)=>{
           if(isLocal(rinfo.address)){
+            logs("game2");
             tcp.write(msg);
           }
         });

@@ -12,7 +12,7 @@ function tp(p){
   return __dirname+"/"+p;
 }
 
-function genuuid(){
+function gennum(){
   let str="";
   while(str.length<16){
     str+=Math.floor(Math.random()*36).toString(36).toUpperCase();
@@ -43,7 +43,7 @@ const AutoUnpack=(c,fn)=>{
 格式
 {
   method:方法
-  status:响应状态，0成功1失败，请求是2
+  status:响应状态，0成功1失败
   reason:失败原因
 }
 用\r\n分割
@@ -64,7 +64,8 @@ const createServer=function(){
   udp.bind(()=>{
     udpPort=udp.address().port;
   });
-  let usedIds=[];
+  const usedIds={};
+  const udpmap=new Map();
   const srv=net.createServer((c)=>{
     AutoUnpack(c,(e,i)=>{
         switch(e.method){
@@ -79,31 +80,43 @@ const createServer=function(){
               }));
               break;
             }
-            usedIds.push(id);
+            usedIds[id]=c;
             c.write(Pack({
               method:"create",
               status:0,
               code:id
             }));
             srv.emit("hostjoin",id);
-            
+            srv.on("connection",cnct);
+            //基站关闭
+            c.on("close",()=>{
+              delete usedIds[id];
+            });
+            c.on("error",err=>{srv.emit("Error",err)});
+            break;
             //处理连接请求
             
-            function cnct(req){
+          case "connect":
+            const host=usedIds[e.code];
+            if(!host){
+              c.end(Pack({
+                method:"connect",
+                status:1,
+                reason:"host not found"
+              }));
+              break;
+            }
               //有客户端
-              AutoUnpack(req,(e)=>{
-                if(e.method!="connect"||e.code!=id)return;
-                //req是客户端，c是远程基站
+                //c是客户端，host是远程房主
                 //验证码
-                let confirm=genuuid();
-                c.write(Pack({
+                let confirm=gennum();
+                host.write(Pack({
                   method:"connect2",
-                  status:2,
                   name:e.name,
                   confirm:confirm,
                   port:udpPort
                 }));
-                req.write(Pack({
+                c.write(Pack({
                   method:"connect",
                   status:0,
                   confirm:confirm,
@@ -113,34 +126,37 @@ const createServer=function(){
                 {
                   let cfm=[];
                   let canMsg=false;
+                  udp.on("message",(msg,rinfo)=>{
+                    if(msg.toString()==confirm){
+                      cfm.push(para);
+                      if(cfm.length==2){
+                        //连接完成。
+                        //连接完成后向双方tcp发送连接完成数据包
+                        //并断开客户端的连接
+                        c.end(Pack({
+                          method:"confirm",
+                          status:0
+                        }));
+                        host.write(Pack({
+                          method:"confirm",
+                          status:0,
+                          confirm:confirm
+                        }));
+                        function cmap(){
+                          let m={
+                            [cfm[0].join(":")]:cfm[1],
+                            [cfm[1].join(":")]:cfm[0]
+                          };
+                        }
+                        srv.emit("clientjoin",id);
+                      }
+                    }
+                  });
                   function udpCnct(msg,rinfo){
                     let para=[rinfo.port,rinfo.address];
                     let notPing=[];//还没有发送ping的主机
                     if(!canMsg){
-                      if(msg.toString()==confirm){
-                        cfm.push(para);
-                        if(cfm.length==2){
-                          //连接完成。
-                          canMsg=true;
-                          cfm.forEach(e=>udp.send(Buffer.alloc(1),...e));
-                          cfm={
-                            [cfm[0].join(":")]:cfm[1],
-                            [cfm[1].join(":")]:cfm[0]
-                          }
-                          let pingChecker=setInterval(()=>{
-                            //定期检查socket存活状态
-                            if(notPing.length!=0){
-                              udp.off("message",udpCnct);
-                              clearInterval(pingChecker);
-                              srv.emit("clientexit",id);
-                            }else{
-                              notPing=Object.keys(cfm);
-                              console.log("存活");
-                            }
-                          },10*1000)
-                          srv.emit("clientjoin",id);
-                        }
-                      }
+                      
                     }else{
                       let k=para.join(":")
                       let m=cfm[k];
@@ -154,30 +170,8 @@ const createServer=function(){
                       if(m)udp.send(msg,...m);
                     }
                   }
-                  udp.on("message",udpCnct);
-                  c.on("close",()=>udp.off("message",udpCnct));
                 }
-              })
-            }
-            srv.on("connection",cnct);
-            //基站关闭
-            c.on("close",()=>{
-              usedIds.forEach((e,i)=>{
-                if(e==id){
-                  usedIds.splice(i,1);
-                  srv.emit("hostexit",id);
-                }
-              });
-            });
-            break;
-          case "connect":
-            if(!usedIds.includes(e.code)){
-              c.end(Pack({
-                method:"connect",
-                status:1,
-                reason:"host not found"
-              }));
-            }
+            
             break;
         }
     });
