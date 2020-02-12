@@ -196,7 +196,7 @@ const createServer = function () {
     }
   });
   //每分钟检查一次udp活动状态
-  setInterval(() => {
+  /*setInterval(() => {
     udpmap.forEach((e) => {
       if (e.check.length == 0) {
         e.resetCheck();
@@ -204,7 +204,7 @@ const createServer = function () {
         e.remove();
       }
     });
-  }, 60 * 1000);
+  }, 60 * 1000);*/
   srv.on("error", (err) => { });//console.log(err)})
   return srv;
 }

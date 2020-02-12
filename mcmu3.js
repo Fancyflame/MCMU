@@ -164,7 +164,10 @@ function host() {
   });
   host.on("Exit", (name) => {
     console.log(name + " Exitted");
-  })
+  });
+  host.on("Abort",()=>{
+    console.log("连接已断开。新的玩家无法加入，但现有的玩家将会继续游戏。");
+  });
 }
 function server() {
   let srv = pro.createServer();
