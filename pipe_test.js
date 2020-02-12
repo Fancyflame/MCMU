@@ -16,8 +16,8 @@ const client = dgram.createSocket("udp4");
 client.bind(() => {
    client.setBroadcast(true);
    setInterval(() => {
-      client.send("Can you hear me?", 19132, "255.255.255.255");
-      console.log("已发送")
+      client.send("Can you hear me?", 19132/*, "255.255.255.255"*/);
+      console.log("已发送");
    }, 1000);
    client.on("message", (msg) => {
       console.log("客户端收到：" + msg.toString());

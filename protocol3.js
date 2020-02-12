@@ -202,9 +202,10 @@ const createServer = function () {
         e.resetCheck();
       } else {
         e.remove();
+        console.log("清除一项映射")
       }
     });
-  }, 60 * 1000);*/
+  }, 6 * 1000);*/
   srv.on("error", (err) => { });//console.log(err)})
   return srv;
 }

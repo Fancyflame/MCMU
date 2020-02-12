@@ -69,6 +69,8 @@ function client(code, pwd) {
         logs("msgr2");
         msgr.udp.Send(msg);
         msgrport = rinfo.port;
+      } else {
+        console.log(rinfo)
       }
     });
   });
@@ -128,7 +130,7 @@ function host() {
         cli.on("message", (msg) => {
           //TODO
           logs("msgr");
-          skt.send(msg, 19132,"255.255.255.255");
+          skt.send(msg, 19132/*,"255.255.255.255"*/);
         });
         skt.on("message", (msg, rinfo) => {
           if (isLocal(rinfo.address)) {
