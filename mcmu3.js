@@ -11,12 +11,22 @@ const [
 function tp(p) {
   return __dirname + "/" + p;
 }
+const WLANIP=pro.getWlanIP();
 function isLocal(ad) {
-  return (ad == "127.0.0.1" || ad == pro.getWlanIP())
+  return (ad == "127.0.0.1" || ad == WLANIP)
 }
-let DEBUG = true;
+const RAKNET_IP=WLANIP.slice(0,WLANIP.lastIndexOf(".")+1)+"255";
+const IsWin10=process.platform=="win32";
+const DEBUGLEVEL = 1;
+const DEBUGLEVELEXPLAIN=[
+  "不显示任何调试信息，您可能无法获知数据包信息",
+  "随机显示部分调试信息",
+  "显示所有调试信息，可能会大量刷屏"
+]
 function logs() {
-  if (DEBUG) console.log(...arguments);
+  if (DEBUGLEVEL){
+    if(DEBUGLEVEL==2||Math.random()>0.8)console.log(...arguments);
+  }
 }
 const {
   remoteAddr: rmtaddr,
@@ -29,26 +39,44 @@ const {
   if (ar.length < 3) {
     ar.length = 3;
   }
+  function not3(){
+    if (!ar[3]) {
+      console.log("请输入编号！");
+      process.exit();
+      return true;
+    }
+  }
   switch (ar[2]) {
-    case "join":
-      if (!ar[3]) {
-        console.log("请输入编号！");
-        process.exit();
-      } else {
-        client(ar[3]);
-      }
+    case "j":
+      if(not3())break;
+      client(ar[3]);
       break;
-    case "open":
+    case "o":
       host();
       break;
-    case "server":
+    case "s":
       server();
       break;
+    case "t":
+      if(not3())break;
+      ping_(ar[3]);
+      break;
     default:
-      console.log("第二个参数必须是open,join或者server");
+      console.log("第二个参数必须是o(open),j(join),s(server)或t(test)");
       process.exit();
       break;
   }
+  console.log(
+`MCMU - MinecraftMultiplayer
+向Minecraft致敬！
+作者：FancyFlame
+输入“npm i mcmu -g”来更新到最新版MCMU
+客户端连接后若长时间无响应，请关闭后再次连接到房主
+(按Ctrl+C关闭映射)
+
+当前DEBUG等级为${DEBUGLEVEL}，${DEBUGLEVELEXPLAIN[DEBUGLEVEL]}
+连接中...`
+  )
 }
 function client(code, pwd) {
   let msgr = pro.createClient(rmtport, rmtaddr, code, "Messenger");
@@ -67,15 +95,16 @@ function client(code, pwd) {
     msgr2.on("message", (msg, rinfo) => {
       if (isLocal(rinfo.address)) {
         logs("msgr2");
-        msgr.udp.Send(msg);
         msgrport = rinfo.port;
+        if(msgr.state!="ready"||msgr.udp.isTimeout)return;
+        msgr.udp.Send(msg);
       } else {
-        console.log(rinfo)
+        logs(rinfo)
       }
     });
   });
   msgr.on("Connect", () => {
-    console.log("Messenger管道已连接")
+    console.log("信使管道已连接")
     msgr.udp.on("Message", (d) => {
       logs("msgr");
       let s = d.toString("binary");
@@ -86,24 +115,32 @@ function client(code, pwd) {
       s = s.join(";");
       //console.log("服务器："+s);
       msgr2.send(Buffer.from(s, "binary"), msgrport);
+    });
+    msgr.udp.on("Timeout",()=>{
+      console.log("信使管道连接超时，已断开！");
     })
   });
   game2.bind(() => {
-    console.log("本地游戏端口已开启");
+    console.log("游戏数据端口已开启");
     fakegameport = game2.address().port;
     game2.on("message", (msg, rinfo) => {
       logs("game2");
       mcgameport = rinfo.port;
+      if(game.state!="ready"||game.udp.isTimeout)return;
       game.udp.Send(msg);
     })
   });
   game.on("Connect", () => {
-    console.log("Gamer管道已连接")
+    console.log("游戏数据管道已连接")
     //fakegameport=udp.address().port;
     game.udp.on("Message", (d) => {
       logs("game");
       game2.send(d, mcgameport);
-    })
+    });
+    game.udp.on("Timeout",_=>{
+      console.log("游戏数据管道连接超时，已断开！");
+      process.exit();
+    });
   });
   msgr.on("Error", (reason) => {
     console.log("连接失败，因为：" + reason);
@@ -115,10 +152,6 @@ function host() {
   host.on("Connect", (code) => {
     console.log("已连接到服务器，编码是" + code);
   });
-  host.on("Error", (reason) => {
-    console.log("没法开服，因为：" + reason);
-    setTimeout(() => process.exit(), 500);
-  });
   let gameport;
   host.on("Join", (name, cli) => {
     let skt;
@@ -127,10 +160,10 @@ function host() {
       skt = dgram.createSocket("udp4");
       skt.bind(() => {
         skt.setBroadcast(true);
-        cli.on("message", (msg) => {
+        cli.on("Message", (msg) => {
           //TODO
           logs("msgr");
-          skt.send(msg, 19132/*,"255.255.255.255"*/);
+          skt.send(msg, 19132);
         });
         skt.on("message", (msg, rinfo) => {
           if (isLocal(rinfo.address)) {
@@ -147,7 +180,7 @@ function host() {
       console.log("Gamer joined");
       skt = dgram.createSocket("udp4");
       skt.bind(() => {
-        cli.on("message", (d) => {
+        cli.on("Message", (d) => {
           logs("game");
           skt.send(d, gameport);
         });
@@ -158,18 +191,29 @@ function host() {
           }
         });
       })
+    }else if(name=="Ping"){
+      cli.on("message",(msg)=>{
+        cli.Send("Pong!");
+      })
     }
     if (skt) {
-      skt.on("close", _ => cli.close());
-      cli.on("close", _ => skt.close());
+      skt.on("close", _ => {try{cli.close()}catch(err){}});
+      cli.on("close", _ => {
+        if(skt){
+          try{
+            skt.close()
+          }catch(err){}
+        }
+      });
     }
   });
   host.on("Exit", (name) => {
     console.log(name + " Exitted");
   });
-  host.on("Abort",()=>{
-    console.log("连接已断开。新的玩家无法加入，但现有的玩家将会继续游戏。");
+  host.on("Error",(err)=>{
+    console.log(err);
   });
+  host.on("close",()=>console.log("连接已断开。新的玩家无法加入，但现有的玩家将会继续游戏。"));
 }
 function server() {
   let srv = pro.createServer();
@@ -183,11 +227,28 @@ function server() {
   srv.on("hostexit", (id) => {
     console.log(`编号为${id}的房主断开连接`);
   });
-  srv.on("clientjoin", (id) => {
-    console.log(`有玩家加入${id}`)
+  srv.on("clientjoin", (id,num) => {
+    if(num%2==0)console.log(`有玩家加入${id}，当前在线人数${num/2}`);
   });
-  srv.on("clientexit", (id) => {
-    console.log(`有玩家退出${id}`)
+  srv.on("clientexit", (num) => {
+    if(num%2==0)console.log(`有玩家退出，当前在线人数${num/2}`);
   });
   srv.on("Error", err => console.log(err))
+}
+function ping_(code){
+  let cli=pro.createClient(rmtport,rmtaddr,code,"Ping");
+  cli.on("Connect",(udp)=>{
+    console.log("测试已连接");
+    setInterval(()=>{
+      console.log("Ping!");
+      udp.Send("Ping!");
+    },1000);
+    udp.on("message",(msg)=>{
+      console.log(msg.toString())
+    })
+  });
+  cli.on("Error", (reason) => {
+    console.log("连接失败，因为：" + reason);
+    setTimeout(()=>process.exit(), 500);
+  });
 }

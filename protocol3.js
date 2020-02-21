@@ -38,6 +38,7 @@ const AutoUnpack = (c, fn) => {
     });
   });
 }
+const CHECK_INTERVAL=20*1000;
 
 /*
 格式
@@ -55,9 +56,10 @@ wlan = getWlanIP();
 const createServer = function () {
   /*
   hostjoin(code)事件
-  clientjoin(code)事件
+  clientjoin(code,onlind)事件，online为当前在线数
   hostexit(code)事件
-  clientexit(code)事件
+  clientexit(online)事件：玩家退出
+  online：返回一个数字，代表当前在线数。不可设置。
   */
   let udpPort;
   const udp = dgram.createSocket("udp4");
@@ -174,7 +176,7 @@ const createServer = function () {
                     if (udpmap.has(e)) udpmap.get(e).remove();
                     udpmap.set(e, cmap)
                   });
-                  srv.emit("clientjoin", e.code);
+                  srv.emit("clientjoin", e.code,srv.online);
                   udp.off("message", arguments.callee);
                 }
               }
@@ -196,17 +198,22 @@ const createServer = function () {
     }
   });
   //每分钟检查一次udp活动状态
-  /*setInterval(() => {
+  setInterval(() => {
     udpmap.forEach((e) => {
       if (e.check.length == 0) {
         e.resetCheck();
       } else {
         e.remove();
-        console.log("清除一项映射")
+        srv.emit("clientexit",srv.online);
       }
     });
-  }, 6 * 1000);*/
+  }, CHECK_INTERVAL);
   srv.on("error", (err) => { });//console.log(err)})
+  Object.defineProperty(srv,"online",{
+    get:()=>{
+      return udpmap.size/2;
+    }
+  })
   return srv;
 }
 
@@ -240,7 +247,7 @@ const createClient = function (Port, Addr, IPcode, name) {
         case "confirm":
           //c.end();
           c.state = "ready";
-          c.udp.stopPing();
+          c.udp.stopSendingConnectPack();
           c.udp.on("message", function () {
             c.emit("Message", ...arguments);
           });
@@ -263,23 +270,18 @@ const createHost = function (Port, Addr) {
   Join事件(name,skt)：name是请求的名字，
     skt是Sender，用于和远程主机通讯
   */
+  let heartbeat;
   let code;
   let c;
   let connToSrv = () => net.createConnection(Port, Addr, () => {
-    let timer = setInterval(() => {
-      if (c.destroyed) {
-        clearInterval(timer);
-        return;
-      }
-      c.write(Buffer.from("\r\n"), Port, Addr);
-    }, 7 * 1000);
+    //防止超时
     c.write(Pack({
       method: "create",
       status: 2
     }));
 
     c.on("error", (err) => {
-      if (err.code == "ECONNABORTED") {
+      if (false&&err.code == "ECONNABORTED") {
         c = connToSrv();
         c.emit("Abort");
       } else {
@@ -302,6 +304,9 @@ const createHost = function (Port, Addr) {
       }
       code = c.code = e.code;
       c.state = "ready"
+      heartbeat = setInterval(() => {
+        c.write(Buffer.from("\r\n"), Port, Addr);
+      }, 10 * 1000);
       c.emit("Connect", code);
     } else if (c.state == "ready") {
       //已连接
@@ -312,16 +317,17 @@ const createHost = function (Port, Addr) {
         checkingSdr.set(e.confirm, sdr);
       } else if (e.method == "confirm") {
         let sdr = checkingSdr.get(e.confirm);
-        sdr.stopPing();
+        sdr.stopSendingConnectPack();
         checkingSdr.delete(e.confirm);
         c.emit("Join", sdr.name, sdr);
       }
     }
   });
+  c.on("close",()=>clearInterval(heartbeat));
   return c;
 }
 
-
+const PingPack=Buffer.alloc(1);
 const createSender = function (Port, Addr, confirm) {
   /*
   只能由服务器自动创建！！
@@ -330,16 +336,22 @@ const createSender = function (Port, Addr, confirm) {
     local和native，分别是从服务器发来的，从
     本地主机发来的和从其它主机发来的
   Connect事件：已经可以发送数据了
+  Timeout事件：已经因为超时断开连接，会自动销毁套接字
+  isTimeout:布尔值，表示是否已超时
   */
   const s = dgram.createSocket("udp4");
   const reminfo = [Port, Addr];
+  let received=false;
+  s.isTimeout=false;
   s.state = "inactive";
   s.Send = (msg, lis) => s.send(msg, ...reminfo, lis);
+  const PingPack=Buffer.alloc(1);
   s.on("message", (msg, rinfo) => {
-    if (s.state != "ready") return;
+    if (s.state != "ready"||s.isTimeout) return;
     let { port, address } = rinfo;
     if (port == Port, address == Addr) {
-      s.emit("Message", msg, "server", rinfo);
+      if(!msg.equals(PingPack))s.emit("Message", msg, "server", rinfo);
+      received=true;
     } else if (address == wlan || address == "127.0.0.1") {
       s.emit("Message", msg, "local", rinfo);
     } else {
@@ -350,10 +362,33 @@ const createSender = function (Port, Addr, confirm) {
     //s.connect(Port, Addr, () => {
     s.state = "waiting";
     let timer = setInterval(() => s.Send(confirm), 1000);
-    s.stopPing = () => {
+    s.stopSendingConnectPack = () => {
       clearInterval(timer);
       s.state = "ready";
       s.emit("Connect");
+      let pinger=setInterval(()=>{
+        try{
+          s.Send(PingPack);
+        }catch(err){
+          clearInterval(pinger);
+        }
+      },Math.floor(CHECK_INTERVAL/5));
+      let pingchecker=setInterval(()=>{
+        if(!received){
+          try{
+            s.close(()=>{
+              s.emit("Timeout");
+              s.isTimeout=true;
+            });
+          }catch(err){
+            s.emit("Timeout");
+            s.isTimeout=true;
+          }
+          clearInterval(pingchecker);
+        }else{
+          received=false;
+        }
+      },CHECK_INTERVAL);
     }
     //})
   });
