@@ -104,7 +104,7 @@ function config() {
             res.end(m.replace("_json", "_json=" + ConfigFile));
         }
     });
-    srv.listen(function () {
+    srv.listen(7774, function () {
         let url = "http://localhost:" + srv.address().port + "/";
         console.log("\n\n配置服务器已运行。系统将尝试打开您的浏览器，如果未启动请用浏览器访问" + url +
             "\n提交页面后自动完成配置");
