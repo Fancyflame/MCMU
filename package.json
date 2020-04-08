@@ -1,6 +1,6 @@
 {
   "name": "mcmu",
-  "version": "1.2.27",
+  "version": "1.2.33",
   "description": "",
   "main": "mcmu3.js",
   "scripts": {
@@ -10,5 +10,5 @@
     "mcmu": "./mcmu3.js"
   },
   "author": "FancyFlame",
-  "license": "ISC"
+  "license": "GPL"
 }

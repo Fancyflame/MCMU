@@ -1,11 +1,10 @@
-
-
+                                                                                                                                                                
 const [
-  fs, net, Url, dgram, os
+  fs, net, Url, dgram, os, ncs
 ] = (function () {
   return [...arguments].map(x => require(x));
 })(
-  "fs", "net", "url", "dgram", "os"
+  "fs", "net", "url", "dgram", "os", "./node-console.js"
 );
 //const port;
 function tp(p) {
@@ -49,9 +48,9 @@ const CHECK_INTERVAL=20*1000;
 }
 用\r\n分割
 */
-let wlan;
+/*let wlan;
 setInterval(() => wlan = getWlanIP(), 5000);
-wlan = getWlanIP();
+wlan = getWlanIP();*/
 
 const createServer = function () {
   /*
@@ -61,11 +60,7 @@ const createServer = function () {
   clientexit(online)事件：玩家退出
   online：返回一个数字，代表当前在线数。不可设置。
   */
-  let udpPort;
-  const udp = dgram.createSocket("udp4");
-  udp.bind(() => {
-    udpPort = udp.address().port;
-  });
+  let udps=Array(5).fill(1);
   const usedIds = {};//用来对应房主
   const udpmap = new Map();//用来映射udp传输
   const srv = net.createServer((c) => {
@@ -78,7 +73,7 @@ const createServer = function () {
             c.end(Pack({
               method: "create",
               status: 1,
-              reason: "too many users"
+              reason: "too many hosts"
             }));
             break;
           }
@@ -98,6 +93,8 @@ const createServer = function () {
 
 
         case "connect":
+          const udp=udps[Math.floor(Math.random()*udps.length)];
+          const udpPort=udp.address().port;
           const host = usedIds[e.code];
           if (!host) {
             c.end(Pack({
@@ -189,13 +186,18 @@ const createServer = function () {
       console.log(err);
     })
   });
-  udp.on("message", (msg, rinfo) => {
-    let para = rinfo.port + ";" + rinfo.address;
-    let target = udpmap.get(para);
-    if (target) {
-      let t = target.get(para);
-      udp.send(msg, ...t);
-    }
+  udps=udps.map(x=>{
+    x=dgram.createSocket("udp4");
+    x.bind();
+    x.on("message", (msg, rinfo) => {
+      let para = rinfo.port + ";" + rinfo.address;
+      let target = udpmap.get(para);
+      if (target) {
+        let t = target.get(para);
+        x.send(msg, ...t);
+      }
+    });
+    return x;
   });
   //每分钟检查一次udp活动状态
   setInterval(() => {
@@ -399,15 +401,13 @@ const createSender = function (Port, Addr, confirm) {
 
 function getWlanIP() {
   let obj = os.networkInterfaces();
+  let arr=[];
   for (let i in obj) {
     for (let o of obj[i]) {
-      if (o.family != "IPv4") continue;
-      if (/^192\.168\./.test(o.address)) {
-        return o.address;
-      }
+      if (o.family == "IPv4") arr.push(o.address);
     }
   }
-  return null;
+  return arr;
 }
 
 module.exports = {

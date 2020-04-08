@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>配置您的MCMU</title>
+</head>
+
+<body>
+    <script>
+        window.onload = function () {
+            const _json;
+            for (let i in _json) {
+                let q = document.getElementsByName(i)[0];
+                if (!q) continue;
+                console.log(q)
+                q.value = _json[i];
+            }
+        }
+    </script>
+    <style>
+        body>form {
+            margin: auto;
+            width: 80vw;
+            max-width: 20cm;
+            height: 80vh;
+            box-shadow: 0 0 20px -10px black;
+            border-top: 10px solid silver;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            line-height: 200%;
+        }
+
+        input {
+            display: block;
+            width: 4cm;
+        }
+
+        input[type=submit] {
+            width: 100%;
+            margin-top: 10px;
+        }
+    </style>
+    <form method="POST" action="success.html" enctype="text/plain">
+        <div>
+            远程服务器地址：<input name="remoteAddr" type="text">
+            远程服务器端口：<input name="remotePort" type="text" value="7773">
+            本地服务器端口：<input name="serverPort" type="text" value="7773">
+            <input type="submit">
+        </div>
+        <p>
+            远程服务器地址指的是您通过服务器远程连接到您的好友时，远程主机的地址。<br>
+            本地服务器指的是运行服务器的主机，如果您不是服主，可以忽略它。<br>
+        </p>
+    </form>
+</body>
+
+</html>
